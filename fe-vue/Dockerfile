@@ -11,7 +11,7 @@ RUN npm ci
 COPY . .
 
 # Build the app
-RUN npm run build
+RUN npx vite build
 
 
 # Stage 2: Serve with nginx
