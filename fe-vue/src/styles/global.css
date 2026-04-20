@@ -1,0 +1,220 @@
+/* ================================================================
+   global.css — ONLY custom theme styles.
+   Bootstrap 5 (via CDN in index.html) handles grid, components,
+   forms, buttons, utilities etc.  Do NOT duplicate those here.
+   ================================================================ */
+
+@import url('https://fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,600,700&display=swap');
+
+body {
+  font-family: 'Source Sans Pro', sans-serif;
+}
+
+/* ── Hero sections ──────────────────────────────────────────── */
+.hero-wrap,
+.hero-wrap-2 {
+  background-color: #1a2a4a;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+}
+
+.hero-wrap {
+  min-height: 600px;
+  display: flex;
+  align-items: center;
+}
+
+.hero-wrap-2 {
+  min-height: 300px;
+  display: flex;
+  align-items: flex-end;
+}
+
+.overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 0;
+}
+
+.hero-wrap .container,
+.hero-wrap-2 .container {
+  position: relative;
+  z-index: 1;
+}
+
+/* slider text inside hero */
+.slider-text,
+.slider-text h1,
+.bread {
+  color: #fff;
+}
+
+.slider-text p {
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.slider-text h1,
+.bread { font-size: 42px; font-weight: 700; }
+
+.breadcrumbs { color: #fff; font-size: 14px; }
+.breadcrumbs a { color: #fff; text-decoration: none; }
+.breadcrumbs a:hover { text-decoration: underline; }
+
+/* ── Parallax section ───────────────────────────────────────── */
+.ftco-section-parallax {
+  background: linear-gradient(rgba(0,0,0,.6), rgba(0,0,0,.6)),
+              linear-gradient(135deg, #1a2a4a 0%, #0f3460 100%);
+  background-size: cover;
+  background-attachment: fixed;
+  padding: 80px 0;
+  min-height: 400px;
+  display: flex;
+  align-items: center;
+}
+
+/* ── Generic content sections ───────────────────────────────── */
+.ftco-section        { padding: 60px 0; }
+.ftco-section.ftco-no-pb { padding-bottom: 0; }
+
+.heading-section     { margin-bottom: 40px; }
+.heading-section h2  { font-size: 36px; margin-bottom: 20px; }
+.heading-section-white,
+.heading-section-white h2 { color: #fff; }
+
+.subheading {
+  color: #999;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  font-weight: 600;
+}
+
+/* ── Job post list items ─────────────────────────────────────── */
+.job-post-item {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.job-post-item:hover { box-shadow: 0 4px 12px rgba(0,0,0,.1); }
+
+.job-post-item-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.job-post-item-header h2 { margin: 0; font-size: 20px; }
+
+.subadge {
+  display: inline-block;
+  background: #007bff;
+  color: #fff;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.job-post-item-body {
+  display: flex;
+  gap: 20px;
+  color: #666;
+  font-size: 14px;
+  flex-wrap: wrap;
+}
+.job-post-item-body a { color: #007bff; text-decoration: none; cursor: pointer; }
+.job-post-item-body a:hover { text-decoration: underline; }
+
+.one-third  { flex: 1; }
+.one-forth  { flex: 0.5; min-width: 150px; }
+
+/* ── Category list ───────────────────────────────────────────── */
+.category         { list-style: none; padding: 0; }
+.category li      { margin-bottom: 15px; }
+.category a {
+  display: block;
+  padding: 20px;
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all .3s;
+  text-decoration: none !important;
+  color: #333;
+}
+.category a:hover { box-shadow: 0 4px 12px rgba(0,0,0,.1); border-color: #007bff; }
+.category a p    { margin: 0 0 10px; font-weight: 600; }
+.category a span { display: block; font-size: 12px; color: #999; }
+.category .number { font-size: 24px; font-weight: 700; color: #007bff; }
+
+/* ── Sidebar / company boxes ─────────────────────────────────── */
+.sidebar { margin-top: 20px; }
+
+.sidebar-box {
+  background: #fff;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  margin-bottom: 20px;
+  padding: 20px;
+}
+.sidebar-box .company-wrap { display: block; padding: 10px; text-align: center; cursor: pointer; }
+.sidebar-box img            { max-width: 100%; height: auto; border-radius: 4px; }
+.sidebar-box h3             { font-size: 16px; margin: 0 0 10px; }
+.sidebar-box h3 a           { color: #007bff; text-decoration: none; cursor: pointer; }
+.sidebar-box h3 a:hover     { text-decoration: underline; }
+.sidebar-box .number        { font-weight: 700; color: #007bff; }
+
+/* ── Stats / counter blocks ──────────────────────────────────── */
+.block-18              { background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+.block-18 .text        { display: flex; align-items: center; gap: 15px; }
+.block-18 .icon        { font-size: 40px; color: #007bff; }
+.block-18 .number      { font-size: 28px; font-weight: 700; color: #007bff; }
+.block-18 .desc span   { display: block; font-size: 12px; color: #999; }
+
+/* ── Service blocks ──────────────────────────────────────────── */
+.block-6               { padding: 20px; text-align: center; background: #fff; }
+.block-6 .icon         { font-size: 48px; color: #007bff; margin-bottom: 20px; }
+.block-6 .heading,
+.media-body h3         { font-size: 18px; font-weight: 600; }
+
+/* ── Pagination ──────────────────────────────────────────────── */
+.block-27 ul {
+  list-style: none; padding: 0;
+  display: flex; gap: 5px;
+  justify-content: center; flex-wrap: wrap;
+}
+.block-27 li {
+  border: 1px solid #ddd;
+  padding: 8px 12px; min-width: 35px;
+  text-align: center; border-radius: 4px; background: #fff;
+}
+.block-27 li.active   { background: #007bff; color: #fff; border-color: #007bff; }
+.block-27 li.disabled { opacity: .5; cursor: not-allowed; }
+.block-27 li a        { cursor: pointer; color: #333; text-decoration: none; display: block; }
+.block-27 li.active a { color: #fff; }
+
+/* ── Responsive ──────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .job-post-item   { flex-direction: column; }
+  .one-forth       { flex: 1; min-width: 100%; }
+  .hero-wrap       { min-height: 400px; }
+  .slider-text h1  { font-size: 32px; }
+  .heading-section h2 { font-size: 24px; }
+}
+
+@media (max-width: 576px) {
+  .slider-text h1     { font-size: 24px; }
+  .heading-section h2 { font-size: 20px; }
+  .block-18           { padding: 15px; }
+  .job-post-item      { padding: 15px; }
+  .sidebar-box        { padding: 15px; }
+}

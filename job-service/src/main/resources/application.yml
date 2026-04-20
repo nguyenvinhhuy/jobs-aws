@@ -1,0 +1,65 @@
+spring:
+  application:
+    name: job-service
+  datasource:
+    # Default points to localhost for running the backend directly outside Docker.
+    # When running inside Docker, docker-compose overrides DB_URL to use the service name (postgres:5432).
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/jobsdb}
+    username: ${DB_USERNAME:jobs}
+    password: ${DB_PASSWORD:jobs}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none
+    open-in-view: false
+  sql:
+    init:
+      mode: always
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+  mvc:
+    problemdetails:
+      enabled: true
+  mail:
+    host: ${MAIL_HOST:localhost}
+    port: ${MAIL_PORT:1025}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_SMTP_AUTH:false}
+          starttls:
+            enable: ${MAIL_SMTP_STARTTLS:false}
+
+server:
+  port: 8080
+  servlet:
+    session:
+      timeout: 30m
+      cookie:
+        http-only: true
+        same-site: lax
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: when-authorized
+
+app:
+  cors:
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:http://localhost:5173}
+  mail:
+    enabled: ${APP_MAIL_ENABLED:false}
+    from-address: ${APP_MAIL_FROM_ADDRESS:no-reply@jobs-aws.local}
+    from-name: ${APP_MAIL_FROM_NAME:Jobs AWS}
+    frontend-base-url: ${APP_FRONTEND_BASE_URL:http://localhost:5173}
+    verification-ttl: ${APP_MAIL_VERIFICATION_TTL:24h}
+  storage:
+    upload-dir: ${APP_STORAGE_UPLOAD_DIR:uploads}

@@ -1,0 +1,63 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: jobs-aws-postgres
+    environment:
+      POSTGRES_DB: jobsdb
+      POSTGRES_USER: jobs
+      POSTGRES_PASSWORD: jobs
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./job-service/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./job-service/src/main/resources/data.sql:/docker-entrypoint-initdb.d/02-data.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U jobs -d jobsdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  job-service:
+    image: backend:local
+    build:
+      context: ./job-service
+    container_name: jobs-aws-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/jobsdb
+      DB_USERNAME: jobs
+      DB_PASSWORD: jobs
+      SPRING_SQL_INIT_MODE: never
+      APP_CORS_ALLOWED_ORIGINS: http://localhost:5173
+      APP_FRONTEND_BASE_URL: http://localhost:5173
+      APP_STORAGE_UPLOAD_DIR: /app/uploads
+    ports:
+      - "8080:8080"
+    volumes:
+      - backend_uploads:/app/uploads
+
+  fe-vue:
+    image: frontend:local
+    build:
+      context: ./fe-vue
+      dockerfile: Dockerfile.dev
+    container_name: jobs-aws-frontend
+    depends_on:
+      - job-service
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./fe-vue/src:/app/src
+      - ./fe-vue/public:/app/public
+      - ./fe-vue/index.html:/app/index.html
+      - ./fe-vue/vite.config.ts:/app/vite.config.ts
+    environment:
+      # Vite dev-server proxy target (Docker network: service name resolves to backend container)
+      BACKEND_URL: http://job-service:8080
+
+volumes:
+  postgres_data:
+  backend_uploads:
