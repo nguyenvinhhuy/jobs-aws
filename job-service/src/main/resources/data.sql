@@ -65,13 +65,16 @@ insert into applypost (id, name_cv, text, status, recruitment_id, user_id, creat
     (2, 'alex-cv.pdf', 'Please review my profile.', 1, 3, 6, '2026-04-02')
 on conflict (id) do nothing;
 
-alter table category alter column id restart with 8;
-alter table role alter column id restart with 3;
-alter table cv alter column id restart with 7;
-alter table users alter column id restart with 7;
-alter table company alter column id restart with 5;
-alter table recruitment alter column id restart with 7;
-alter table follow_company alter column id restart with 5;
-alter table save_job alter column id restart with 4;
-alter table applypost alter column id restart with 3;
-alter table reset_token alter column id restart with 1;
+
+-- Advance each sequence to at least the seed's max value, but never below the current actual max.
+-- This is safe to run on every startup (idempotent).
+select setval(pg_get_serial_sequence('category',     'id'), greatest(8,  coalesce((select max(id) from category),     0)));
+select setval(pg_get_serial_sequence('role',         'id'), greatest(3,  coalesce((select max(id) from role),         0)));
+select setval(pg_get_serial_sequence('cv',           'id'), greatest(7,  coalesce((select max(id) from cv),           0)));
+select setval(pg_get_serial_sequence('users',        'id'), greatest(7,  coalesce((select max(id) from users),        0)));
+select setval(pg_get_serial_sequence('company',      'id'), greatest(5,  coalesce((select max(id) from company),      0)));
+select setval(pg_get_serial_sequence('recruitment',  'id'), greatest(7,  coalesce((select max(id) from recruitment),  0)));
+select setval(pg_get_serial_sequence('follow_company','id'),greatest(5,  coalesce((select max(id) from follow_company),0)));
+select setval(pg_get_serial_sequence('save_job',     'id'), greatest(4,  coalesce((select max(id) from save_job),     0)));
+select setval(pg_get_serial_sequence('applypost',    'id'), greatest(3,  coalesce((select max(id) from applypost),    0)));
+select setval(pg_get_serial_sequence('reset_token',  'id'), greatest(1,  coalesce((select max(id) from reset_token),  0)));
