@@ -61,7 +61,13 @@ jobs:
             echo "POSTGRES_PASSWORD=${{ secrets.POSTGRES_PASSWORD }}"
             echo "DOCKERHUB_USERNAME=${{ secrets.DOCKERHUB_USERNAME }}"
             echo "APP_CORS_ALLOWED_ORIGINS=http://${{ secrets.EC2_HOST }}"
-            echo "APP_MAIL_ENABLED=false"
+            echo "APP_MAIL_ENABLED=${{ secrets.APP_MAIL_ENABLED }}"
+            echo "MAIL_HOST=${{ secrets.MAIL_HOST }}"
+            echo "MAIL_PORT=${{ secrets.MAIL_PORT }}"
+            echo "MAIL_USERNAME=${{ secrets.MAIL_USERNAME }}"
+            echo "MAIL_PASSWORD=${{ secrets.MAIL_PASSWORD }}"
+            echo "MAIL_SMTP_AUTH=true"
+            echo "MAIL_SMTP_STARTTLS=true"
           } > .env
 
           sudo docker compose -f docker-compose.production.yml pull
