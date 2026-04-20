@@ -53,7 +53,7 @@ jobs:
           mkdir -p /home/ubuntu/jobs-aws
           cd /home/ubuntu/jobs-aws
 
-          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | sudo docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
 
           {
             echo "POSTGRES_DB=${{ secrets.POSTGRES_DB }}"
@@ -63,7 +63,7 @@ jobs:
             echo "APP_CORS_ALLOWED_ORIGINS=http://${{ secrets.EC2_HOST }}"
           } > .env
 
-          docker compose -f docker-compose.production.yml pull
-          docker compose -f docker-compose.production.yml up -d --remove-orphans
+          sudo docker compose -f docker-compose.production.yml pull
+          sudo docker compose -f docker-compose.production.yml up -d --remove-orphans
 
-          docker image prune -f
+          sudo docker image prune -f
