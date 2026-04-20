@@ -12,6 +12,8 @@ RUN ./mvnw -q clean package -DskipTests
 FROM eclipse-temurin:25-jre AS runtime
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+
 COPY --from=build /workspace/target/*.jar app.jar
 
 EXPOSE 8080
