@@ -45,7 +45,7 @@ server:
       timeout: 30m
       cookie:
         http-only: true
-        same-site: lax
+        same-site: strict
 
 management:
   endpoints:
@@ -65,5 +65,6 @@ app:
     from-name: ${APP_MAIL_FROM_NAME:Jobs AWS}
     frontend-base-url: ${APP_FRONTEND_BASE_URL:http://localhost:5173}
     verification-ttl: ${APP_MAIL_VERIFICATION_TTL:24h}
+    password-reset-ttl: ${APP_MAIL_PASSWORD_RESET_TTL:1h}
   storage:
     upload-dir: ${APP_STORAGE_UPLOAD_DIR:uploads}

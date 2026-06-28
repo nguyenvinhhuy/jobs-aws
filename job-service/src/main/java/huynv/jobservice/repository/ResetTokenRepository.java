@@ -8,9 +8,9 @@ import huynv.jobservice.domain.ResetToken;
 
 public interface ResetTokenRepository extends JpaRepository<ResetToken, Long> {
 
-    Optional<ResetToken> findByUserId(Long userId);
+    Optional<ResetToken> findByUserIdAndType(Long userId, String type);
 
-    Optional<ResetToken> findByCode(String code);
+    Optional<ResetToken> findByCodeAndType(String code, String type);
 
-    void deleteByUserId(Long userId);
+    void deleteByUserIdAndType(Long userId, String type);
 }

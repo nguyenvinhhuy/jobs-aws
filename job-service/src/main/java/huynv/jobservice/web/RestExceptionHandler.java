@@ -4,14 +4,15 @@ import java.net.URI;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.annotation.Order;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
-
-import org.springframework.core.annotation.Order;
 
 import huynv.jobservice.web.error.AppException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -25,17 +26,23 @@ public class RestExceptionHandler {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(RestExceptionHandler.class);
 
-    @org.springframework.web.bind.annotation.ExceptionHandler(AppException.class)
+    private static final String ERROR_BASE_URI = "https://jobs-aws.local/errors/";
+
+    private static URI errorType(String slug) {
+        return URI.create(ERROR_BASE_URI + slug);
+    }
+
+    @ExceptionHandler(AppException.class)
     public ProblemDetail handleAppException(AppException exception, HttpServletRequest request) {
         ProblemDetail detail = ProblemDetail.forStatusAndDetail(exception.getStatus(), exception.getMessage());
         detail.setTitle(exception.getStatus().getReasonPhrase());
-        detail.setType(URI.create("https://jobs-aws.local/errors/" + exception.getErrorCode().toLowerCase()));
+        detail.setType(errorType(exception.getErrorCode().toLowerCase()));
         detail.setProperty("errorCode", exception.getErrorCode());
         detail.setProperty("path", request.getRequestURI());
         return detail;
     }
 
-    @org.springframework.web.bind.annotation.ExceptionHandler(MethodArgumentNotValidException.class)
+    @ExceptionHandler(MethodArgumentNotValidException.class)
     public ProblemDetail handleValidation(MethodArgumentNotValidException exception, HttpServletRequest request) {
         String message = exception.getBindingResult().getFieldErrors().stream()
             .findFirst()
@@ -44,38 +51,48 @@ public class RestExceptionHandler {
 
         ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, message);
         detail.setTitle("Validation failed");
-        detail.setType(URI.create("https://jobs-aws.local/errors/validation_failed"));
+        detail.setType(errorType("validation_failed"));
         detail.setProperty("errorCode", "VALIDATION_FAILED");
         detail.setProperty("path", request.getRequestURI());
         return detail;
     }
 
-    @org.springframework.web.bind.annotation.ExceptionHandler(MaxUploadSizeExceededException.class)
-    public ProblemDetail handleUploadSize(MaxUploadSizeExceededException exception, HttpServletRequest request) {
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ProblemDetail handleUploadSize(HttpServletRequest request) {
         ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, "Uploaded file is too large");
         detail.setTitle("Invalid upload");
-        detail.setType(URI.create("https://jobs-aws.local/errors/upload_too_large"));
+        detail.setType(errorType("upload_too_large"));
         detail.setProperty("errorCode", "UPLOAD_TOO_LARGE");
         detail.setProperty("path", request.getRequestURI());
         return detail;
     }
 
-    @org.springframework.web.bind.annotation.ExceptionHandler(NoResourceFoundException.class)
-    public ProblemDetail handleNoResourceFound(NoResourceFoundException exception, HttpServletRequest request) {
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ProblemDetail handleNoResourceFound(HttpServletRequest request) {
         ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.NOT_FOUND, "Resource not found: " + request.getRequestURI());
         detail.setTitle("Not Found");
-        detail.setType(URI.create("https://jobs-aws.local/errors/not_found"));
+        detail.setType(errorType("not_found"));
         detail.setProperty("errorCode", "NOT_FOUND");
         detail.setProperty("path", request.getRequestURI());
         return detail;
     }
 
-    @org.springframework.web.bind.annotation.ExceptionHandler(Exception.class)
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ProblemDetail handleDataIntegrity(HttpServletRequest request) {
+        ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.CONFLICT, "A resource with this data already exists");
+        detail.setTitle("Conflict");
+        detail.setType(errorType("data_conflict"));
+        detail.setProperty("errorCode", "DATA_CONFLICT");
+        detail.setProperty("path", request.getRequestURI());
+        return detail;
+    }
+
+    @ExceptionHandler(Exception.class)
     public ProblemDetail handleUnexpected(Exception exception, HttpServletRequest request) {
         LOGGER.error("Unhandled request failure on {}", request.getRequestURI(), exception);
         ProblemDetail detail = ProblemDetail.forStatusAndDetail(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected server error");
         detail.setTitle("Internal server error");
-        detail.setType(URI.create("https://jobs-aws.local/errors/internal_server_error"));
+        detail.setType(errorType("internal_server_error"));
         detail.setProperty("errorCode", "INTERNAL_SERVER_ERROR");
         detail.setProperty("path", request.getRequestURI());
         return detail;

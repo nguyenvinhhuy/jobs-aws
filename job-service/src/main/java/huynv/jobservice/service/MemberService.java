@@ -106,6 +106,11 @@ public class MemberService {
 
     public ProfileResponse updateUser(User user, UpdateUserRequest request) {
         user = requireManagedUser(user);
+        if (!user.getEmail().equalsIgnoreCase(request.email())) {
+            userRepository.findByEmail(request.email()).ifPresent(existing -> {
+                throw new ConflictException("EMAIL_ALREADY_EXISTS", "Email is already in use");
+            });
+        }
         user.setFullName(request.fullName());
         user.setAddress(request.address());
         user.setEmail(request.email());
@@ -172,7 +177,7 @@ public class MemberService {
 
     public ToggleStateResponse toggleSaveJob(User user, Long recruitmentId) {
         User managedUser = requireManagedUser(user);
-        recruitmentRepository.findById(recruitmentId)
+        Recruitment recruitment = recruitmentRepository.findById(recruitmentId)
             .orElseThrow(() -> new NotFoundException("RECRUITMENT_NOT_FOUND", "Recruitment not found"));
         return saveJobRepository.findByUserIdAndRecruitmentId(managedUser.getId(), recruitmentId)
             .map(existing -> {
@@ -182,7 +187,7 @@ public class MemberService {
             .orElseGet(() -> {
                 SaveJob saveJob = new SaveJob();
                 saveJob.setUser(managedUser);
-                saveJob.setRecruitment(recruitmentRepository.findById(recruitmentId).orElseThrow());
+                saveJob.setRecruitment(recruitment);
                 saveJobRepository.save(saveJob);
                 return new ToggleStateResponse(true, "Job saved successfully");
             });
@@ -190,7 +195,7 @@ public class MemberService {
 
     public ToggleStateResponse toggleFollowCompany(User user, Long companyId) {
         User managedUser = requireManagedUser(user);
-        companyRepository.findById(companyId)
+        Company company = companyRepository.findById(companyId)
             .orElseThrow(() -> new NotFoundException("COMPANY_NOT_FOUND", "Company not found"));
         return followCompanyRepository.findByUserIdAndCompanyId(managedUser.getId(), companyId)
             .map(existing -> {
@@ -200,7 +205,7 @@ public class MemberService {
             .orElseGet(() -> {
                 FollowCompany followCompany = new FollowCompany();
                 followCompany.setUser(managedUser);
-                followCompany.setCompany(companyRepository.findById(companyId).orElseThrow());
+                followCompany.setCompany(company);
                 followCompanyRepository.save(followCompany);
                 return new ToggleStateResponse(true, "Company followed successfully");
             });
@@ -230,11 +235,8 @@ public class MemberService {
 
     public List<RecruitmentSummaryResponse> getSavedJobs(User user) {
         user = requireManagedUser(user);
-        return saveJobRepository.findByUserIdOrderByIdDesc(user.getId()).stream()
-            .map(saveJob -> recruitmentRepository.findById(saveJob.getRecruitment().getId()))
-            .filter(java.util.Optional::isPresent)
-            .map(java.util.Optional::get)
-            .map(this::toRecruitmentSummary)
+        return saveJobRepository.findByUserIdWithRecruitmentOrderByIdDesc(user.getId()).stream()
+            .map(saveJob -> toRecruitmentSummary(saveJob.getRecruitment()))
             .toList();
     }
 
@@ -429,6 +431,9 @@ public class MemberService {
                 .replace(" ", "-");
             String fileName = UUID.randomUUID() + "-" + originalFileName;
             Path target = directory.resolve(fileName).normalize();
+            if (!target.startsWith(directory)) {
+                throw new BadRequestException("INVALID_FILENAME", "Invalid filename");
+            }
             Files.copy(file.getInputStream(), target, StandardCopyOption.REPLACE_EXISTING);
             return fileName;
         } catch (IOException exception) {

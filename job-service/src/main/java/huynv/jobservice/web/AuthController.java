@@ -13,8 +13,10 @@ import huynv.jobservice.service.AuthService;
 import huynv.jobservice.web.dto.ApiMessageResponse;
 import huynv.jobservice.web.dto.AuthRequest;
 import huynv.jobservice.web.dto.EmailVerificationRequest;
+import huynv.jobservice.web.dto.ForgotPasswordRequest;
 import huynv.jobservice.web.dto.RegisterRequest;
 import huynv.jobservice.web.dto.ResendVerificationRequest;
+import huynv.jobservice.web.dto.ResetPasswordRequest;
 import huynv.jobservice.web.dto.UserSessionResponse;
 import jakarta.servlet.http.HttpSession;
 
@@ -58,5 +60,15 @@ public class AuthController {
     @PostMapping("/verification/resend")
     public ApiMessageResponse resendVerification(@Validated @RequestBody ResendVerificationRequest request) {
         return authService.resendVerification(request);
+    }
+
+    @PostMapping("/password/forgot")
+    public ApiMessageResponse forgotPassword(@Validated @RequestBody ForgotPasswordRequest request) {
+        return authService.forgotPassword(request);
+    }
+
+    @PostMapping("/password/reset")
+    public ApiMessageResponse resetPassword(@Validated @RequestBody ResetPasswordRequest request) {
+        return authService.resetPassword(request);
     }
 }

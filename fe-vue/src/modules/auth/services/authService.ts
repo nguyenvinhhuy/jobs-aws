@@ -1,5 +1,5 @@
 import type { LoginPayload, RegisterPayload } from '../../../core/security/auth-context'
-import { loginRequest, logoutRequest, meRequest, registerRequest, resendVerificationRequest, verifyEmailRequest } from '../api/authApi'
+import { forgotPasswordRequest, loginRequest, logoutRequest, meRequest, registerRequest, resendVerificationRequest, resetPasswordRequest, verifyEmailRequest } from '../api/authApi'
 
 export const authService = {
   login: (payload: LoginPayload) => loginRequest(payload),
@@ -8,4 +8,6 @@ export const authService = {
   me: () => meRequest(),
   verifyEmail: (token: string) => verifyEmailRequest(token),
   resendVerification: (email: string) => resendVerificationRequest(email),
+  forgotPassword: (email: string) => forgotPasswordRequest(email),
+  resetPassword: (token: string, newPassword: string) => resetPasswordRequest(token, newPassword),
 }

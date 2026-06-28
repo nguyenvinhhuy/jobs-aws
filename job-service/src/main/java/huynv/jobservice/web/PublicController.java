@@ -3,6 +3,7 @@ package huynv.jobservice.web;
 import java.util.List;
 
 import org.springframework.data.domain.Page;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,7 +18,10 @@ import huynv.jobservice.web.dto.HomeOverviewResponse;
 import huynv.jobservice.web.dto.PageResponse;
 import huynv.jobservice.web.dto.RecruitmentDetailResponse;
 import huynv.jobservice.web.dto.RecruitmentSummaryResponse;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 
+@Validated
 @RestController
 @RequestMapping("/api/public")
 public class PublicController {
@@ -39,14 +43,14 @@ public class PublicController {
     }
 
     @GetMapping("/companies/top")
-    public List<CompanySummaryResponse> getTopCompanies(@RequestParam(defaultValue = "4") int limit) {
+    public List<CompanySummaryResponse> getTopCompanies(@RequestParam(defaultValue = "4") @Max(100) int limit) {
         return publicQueryService.getTopCompanies(limit);
     }
 
     @GetMapping("/companies")
     public List<CompanySummaryResponse> searchCompanies(
         @RequestParam(required = false) String keyword,
-        @RequestParam(defaultValue = "12") int limit
+        @RequestParam(defaultValue = "12") @Max(100) int limit
     ) {
         return publicQueryService.searchCompanies(keyword, limit);
     }
@@ -58,8 +62,8 @@ public class PublicController {
 
     @GetMapping("/recruitments")
     public PageResponse<RecruitmentSummaryResponse> getRecruitments(
-        @RequestParam(defaultValue = "0") int page,
-        @RequestParam(defaultValue = "6") int size,
+        @RequestParam(defaultValue = "0") @Min(0) int page,
+        @RequestParam(defaultValue = "6") @Max(100) int size,
         @RequestParam(required = false) String keyword,
         @RequestParam(required = false) Long categoryId,
         @RequestParam(required = false) Long companyId,

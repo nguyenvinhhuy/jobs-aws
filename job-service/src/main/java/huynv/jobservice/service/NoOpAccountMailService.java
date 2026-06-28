@@ -16,5 +16,10 @@ public class NoOpAccountMailService implements AccountMailService {
     public void sendVerificationEmail(User user, String verificationUrl) {
         LOGGER.info("Mail disabled. Verification URL for {}: {}", user.getEmail(), verificationUrl);
     }
+
+    @Override
+    public void sendPasswordResetEmail(User user, String resetUrl) {
+        LOGGER.info("Mail disabled. Password reset URL for {}: {}", user.getEmail(), resetUrl);
+    }
 }
 

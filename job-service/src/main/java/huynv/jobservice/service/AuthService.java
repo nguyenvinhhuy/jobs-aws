@@ -4,8 +4,10 @@ import huynv.jobservice.domain.User;
 import huynv.jobservice.web.dto.ApiMessageResponse;
 import huynv.jobservice.web.dto.AuthRequest;
 import huynv.jobservice.web.dto.EmailVerificationRequest;
+import huynv.jobservice.web.dto.ForgotPasswordRequest;
 import huynv.jobservice.web.dto.RegisterRequest;
 import huynv.jobservice.web.dto.ResendVerificationRequest;
+import huynv.jobservice.web.dto.ResetPasswordRequest;
 import huynv.jobservice.web.dto.UserSessionResponse;
 import jakarta.servlet.http.HttpSession;
 
@@ -18,6 +20,10 @@ public interface AuthService {
     ApiMessageResponse verifyEmail(EmailVerificationRequest request);
 
     ApiMessageResponse resendVerification(ResendVerificationRequest request);
+
+    ApiMessageResponse forgotPassword(ForgotPasswordRequest request);
+
+    ApiMessageResponse resetPassword(ResetPasswordRequest request);
 
     void logout(HttpSession session);
 

@@ -3,13 +3,17 @@ package huynv.jobservice.service;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.Locale;
 import java.util.Optional;
 
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,8 +31,10 @@ import huynv.jobservice.repository.UserRepository;
 import huynv.jobservice.web.dto.ApiMessageResponse;
 import huynv.jobservice.web.dto.AuthRequest;
 import huynv.jobservice.web.dto.EmailVerificationRequest;
+import huynv.jobservice.web.dto.ForgotPasswordRequest;
 import huynv.jobservice.web.dto.RegisterRequest;
 import huynv.jobservice.web.dto.ResendVerificationRequest;
+import huynv.jobservice.web.dto.ResetPasswordRequest;
 import huynv.jobservice.web.dto.UserSessionResponse;
 import huynv.jobservice.web.error.ConflictException;
 import huynv.jobservice.web.error.NotFoundException;
@@ -40,7 +46,13 @@ import jakarta.servlet.http.HttpSession;
 @Transactional(readOnly = true)
 public class AuthServiceImpl implements AuthService {
 
-    static final String SESSION_USER_ID = "CURRENT_USER_ID";
+    private static final Logger LOGGER = LoggerFactory.getLogger(AuthServiceImpl.class);
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
+    public static final String SESSION_USER_ID = "CURRENT_USER_ID";
+
+    private static final String TOKEN_VERIFICATION = "VERIFICATION";
+    private static final String TOKEN_PASSWORD_RESET = "PASSWORD_RESET";
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
@@ -49,7 +61,7 @@ public class AuthServiceImpl implements AuthService {
     private final ResetTokenRepository resetTokenRepository;
     private final AccountMailService accountMailService;
     private final MailProperties mailProperties;
-    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private final PasswordEncoder passwordEncoder;
 
     public AuthServiceImpl(
         UserRepository userRepository,
@@ -58,7 +70,8 @@ public class AuthServiceImpl implements AuthService {
         CompanyRepository companyRepository,
         ResetTokenRepository resetTokenRepository,
         AccountMailService accountMailService,
-        MailProperties mailProperties
+        MailProperties mailProperties,
+        PasswordEncoder passwordEncoder
     ) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
@@ -67,6 +80,7 @@ public class AuthServiceImpl implements AuthService {
         this.resetTokenRepository = resetTokenRepository;
         this.accountMailService = accountMailService;
         this.mailProperties = mailProperties;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @Override
@@ -127,9 +141,9 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    @Transactional
+    @Transactional(noRollbackFor = BadRequestException.class)
     public ApiMessageResponse verifyEmail(EmailVerificationRequest request) {
-        ResetToken token = resetTokenRepository.findByCode(hashToken(request.token()))
+        ResetToken token = resetTokenRepository.findByCodeAndType(hashToken(request.token()), TOKEN_VERIFICATION)
             .orElseThrow(() -> new NotFoundException("VERIFICATION_TOKEN_INVALID", "Verification token is invalid"));
 
         if (token.getExpiredTime().isBefore(Instant.now())) {
@@ -162,6 +176,45 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
+    public ApiMessageResponse forgotPassword(ForgotPasswordRequest request) {
+        String resetUrl = null;
+        Optional<User> userOpt = userRepository.findByEmail(request.email());
+        if (userOpt.isPresent()) {
+            resetUrl = issuePasswordReset(userOpt.get());
+            try {
+                accountMailService.sendPasswordResetEmail(userOpt.get(), resetUrl);
+            } catch (Exception e) {
+                // Log but do not propagate — preserves anti-enumeration guarantee
+                LOGGER.warn("Failed to send password reset email to {}", request.email(), e);
+            }
+        }
+        String msg = "If this email is registered, a password reset link has been sent";
+        return !mailProperties.isEnabled() && resetUrl != null
+            ? new ApiMessageResponse(msg, resetUrl)
+            : new ApiMessageResponse(msg);
+    }
+
+    @Override
+    @Transactional(noRollbackFor = BadRequestException.class)
+    public ApiMessageResponse resetPassword(ResetPasswordRequest request) {
+        ResetToken token = resetTokenRepository.findByCodeAndType(hashToken(request.token()), TOKEN_PASSWORD_RESET)
+            .orElseThrow(() -> new BadRequestException("RESET_TOKEN_INVALID", "Reset token is invalid or expired"));
+
+        if (token.getExpiredTime().isBefore(Instant.now())) {
+            resetTokenRepository.delete(token);
+            throw new BadRequestException("RESET_TOKEN_EXPIRED", "Reset token has expired");
+        }
+
+        User user = token.getUser();
+        user.setPassword(passwordEncoder.encode(request.newPassword()));
+        userRepository.save(user);
+        resetTokenRepository.delete(token);
+
+        return new ApiMessageResponse("Password reset successfully. You can now sign in with your new password.");
+    }
+
+    @Override
+    @Transactional
     public void logout(HttpSession session) {
         session.invalidate();
     }
@@ -185,21 +238,31 @@ public class AuthServiceImpl implements AuthService {
         return userRepository.findById(id).map(this::toSessionResponse).orElse(null);
     }
 
-    private String issueVerification(User user) {
+    private String issueToken(User user, String type, Duration ttl) {
         String plainToken = generateToken();
-        String hashedToken = hashToken(plainToken);
         Instant now = Instant.now();
 
-        ResetToken token = resetTokenRepository.findByUserId(user.getId()).orElseGet(ResetToken::new);
+        ResetToken token = resetTokenRepository.findByUserIdAndType(user.getId(), type).orElseGet(ResetToken::new);
         token.setUser(user);
-        token.setCode(hashedToken);
+        token.setType(type);
+        token.setCode(hashToken(plainToken));
         token.setCreatedAt(now);
-        token.setExpiredTime(now.plus(mailProperties.getVerificationTtl()));
+        token.setExpiredTime(now.plus(ttl));
         resetTokenRepository.save(token);
 
-        String verificationUrl = buildVerificationUrl(plainToken);
+        return plainToken;
+    }
+
+    private String issueVerification(User user) {
+        String plainToken = issueToken(user, TOKEN_VERIFICATION, mailProperties.getVerificationTtl());
+        String verificationUrl = buildUrl("/verify-email", plainToken);
         accountMailService.sendVerificationEmail(user, verificationUrl);
         return verificationUrl;
+    }
+
+    private String issuePasswordReset(User user) {
+        String plainToken = issueToken(user, TOKEN_PASSWORD_RESET, mailProperties.getPasswordResetTtl());
+        return buildUrl("/reset-password", plainToken);
     }
 
     private ApiMessageResponse verificationResponse(String message, String verificationUrl) {
@@ -208,16 +271,16 @@ public class AuthServiceImpl implements AuthService {
             : new ApiMessageResponse(message, verificationUrl);
     }
 
-    private String buildVerificationUrl(String token) {
+    private String buildUrl(String path, String token) {
         String baseUrl = Optional.ofNullable(mailProperties.getFrontendBaseUrl())
             .filter(url -> !url.isBlank())
             .orElse("http://localhost:5173");
-        return baseUrl + "/verify-email?token=" + token;
+        return baseUrl + path + "?token=" + token;
     }
 
     private String generateToken() {
         byte[] random = new byte[32];
-        new java.security.SecureRandom().nextBytes(random);
+        SECURE_RANDOM.nextBytes(random);
         return Base64.getUrlEncoder().withoutPadding().encodeToString(random);
     }
 

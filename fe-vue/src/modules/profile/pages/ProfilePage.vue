@@ -4,58 +4,11 @@ import { useRoute, useRouter } from 'vue-router'
 
 import { useI18n } from '../../../core/i18n/useI18n'
 import StatusBanner from '../../../shared/components/common/StatusBanner.vue'
-import type { ApplyPostSummary, CategorySummary, CompanySummary, ProfileResponse, RecruitmentSummary } from '../../../shared/types/api'
+import type { CategorySummary } from '../../../shared/types/api'
 import { getCategories } from '../../jobs/api/jobsApi'
 import { useAuth } from '../../auth/composables/useAuth'
-import {
-  approveApplicant,
-  createRecruitment,
-  deleteApplication,
-  deleteRecruitment,
-  getEmployerApplicants,
-  getEmployerRecruitments,
-  getFollowedCompanies,
-  getMyApplications,
-  getProfile,
-  getSavedJobs,
-  updateCompany,
-  updateProfile,
-  updateRecruitment,
-  uploadAvatar,
-  uploadCv,
-  uploadLogo,
-} from '../api/memberApi'
-
-// ── Enums ──────────────────────────────────────────────────────────────────
-enum Role {
-  USER = 'USER',
-  EMPLOYER = 'EMPLOYER',
-}
-
-enum JobRank {
-  FRESHER = 'Fresher',
-  JUNIOR = 'Junior',
-  MIDDLE = 'Middle',
-  SENIOR = 'Senior',
-  LEAD = 'Lead',
-  MANAGER = 'Manager',
-}
-
-enum JobType {
-  FULLTIME = 'Fulltime',
-  PARTTIME = 'Parttime',
-  REMOTE = 'Remote',
-  CONTRACT = 'Contract',
-  INTERNSHIP = 'Internship',
-}
-
-const JOB_RANKS = Object.values(JobRank)
-const JOB_TYPES = Object.values(JobType)
-
-// ── File upload constants ──────────────────────────────────────────────────
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024  // 5 MB
-const MAX_CV_SIZE = 10 * 1024 * 1024    // 10 MB
-const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+import { useProfile } from '../composables/useProfile'
+import { useEmployer, JOB_RANKS, JOB_TYPES } from '../composables/useEmployer'
 
 const router = useRouter()
 const route = useRoute()
@@ -66,6 +19,8 @@ const loading = ref(false)
 const errorMessage = ref('')
 const noticeMessage = ref('')
 
+const categories = ref<CategorySummary[]>([])
+
 const authMode = ref<'login' | 'register'>('login')
 const authForm = ref({
   fullName: '',
@@ -73,47 +28,30 @@ const authForm = ref({
   email: '',
   phoneNumber: '',
   password: '',
-  roleName: Role.USER as Role,
+  roleName: 'USER' as 'USER' | 'EMPLOYER',
 })
 const authErrors = ref({ email: '', password: '', fullName: '' })
 
-const profile = ref<ProfileResponse | null>(null)
-const categories = ref<CategorySummary[]>([])
-const savedJobs = ref<RecruitmentSummary[]>([])
-const followedCompanies = ref<CompanySummary[]>([])
-const myApplications = ref<ApplyPostSummary[]>([])
-const employerJobs = ref<RecruitmentSummary[]>([])
-const employerApplicants = ref<ApplyPostSummary[]>([])
-const editingRecruitmentId = ref<number | null>(null)
+const profileComposable = useProfile()
+const employerComposable = useEmployer(categories)
 
-const profileForm = ref({
-  fullName: '',
-  address: '',
-  email: '',
-  description: '',
-  phoneNumber: '',
-})
-const companyForm = ref({
-  companyName: '',
-  address: '',
-  email: '',
-  description: '',
-  phoneNumber: '',
-})
-const recruitmentForm = ref({
-  title: '',
-  address: '',
-  description: '',
-  experience: '',
-  quantity: 1,
-  rank: JobRank.FRESHER as string,
-  salary: '',
-  type: JobType.FULLTIME as string,
-  deadline: '',
-  categoryId: 1,
-})
+const {
+  profile,
+  savedJobs,
+  followedCompanies,
+  myApplications,
+  profileForm,
+  companyForm,
+} = profileComposable
 
-const isEmployer = computed(() => auth.currentUser.value?.roleName === Role.EMPLOYER)
+const {
+  employerJobs,
+  employerApplicants,
+  editingRecruitmentId,
+  recruitmentForm,
+} = employerComposable
+
+const isEmployer = computed(() => auth.currentUser.value?.roleName === 'EMPLOYER')
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 function handleError(error: unknown, fallback: string) {
@@ -128,7 +66,6 @@ function validateAuthForm(): boolean {
     authErrors.value.fullName = t('profile.validation.fullNameRequired')
     valid = false
   }
-
   if (!authForm.value.email.trim()) {
     authErrors.value.email = t('profile.validation.emailRequired')
     valid = false
@@ -136,7 +73,6 @@ function validateAuthForm(): boolean {
     authErrors.value.email = t('profile.validation.emailInvalid')
     valid = false
   }
-
   if (!authForm.value.password) {
     authErrors.value.password = t('profile.validation.passwordRequired')
     valid = false
@@ -148,101 +84,27 @@ function validateAuthForm(): boolean {
   return valid
 }
 
-function validateUploadFile(file: File, type: 'avatar' | 'cv' | 'logo'): string | null {
-  if (type === 'avatar' || type === 'logo') {
-    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-      return t('profile.validation.fileInvalidType')
-    }
-    if (file.size > MAX_IMAGE_SIZE) {
-      return t('profile.validation.fileTooLarge')
-    }
-  } else if (type === 'cv') {
-    if (file.size > MAX_CV_SIZE) {
-      return t('profile.validation.fileTooLarge')
-    }
-  }
-  return null
-}
-
 function resetAuthForm() {
-  authForm.value = { fullName: '', address: '', email: '', phoneNumber: '', password: '', roleName: Role.USER }
+  authForm.value = { fullName: '', address: '', email: '', phoneNumber: '', password: '', roleName: 'USER' }
   authErrors.value = { email: '', password: '', fullName: '' }
-}
-
-function resetRecruitmentForm() {
-  editingRecruitmentId.value = null
-  recruitmentForm.value = {
-    title: '',
-    address: '',
-    description: '',
-    experience: '',
-    quantity: 1,
-    rank: JobRank.FRESHER,
-    salary: '',
-    type: JobType.FULLTIME,
-    deadline: '',
-    categoryId: categories.value[0]?.id ?? 1,
-  }
 }
 
 // ── Data loading ───────────────────────────────────────────────────────────
 async function loadAuthenticatedData() {
-  const [loadedProfile, loadedCategories, loadedSavedJobs, loadedCompanies, loadedApplications] = await Promise.all([
-    getProfile(),
-    getCategories(),
-    getSavedJobs(),
-    getFollowedCompanies(),
-    getMyApplications(),
-  ])
-
-  profile.value = loadedProfile
-  categories.value = loadedCategories
-  savedJobs.value = loadedSavedJobs
-  followedCompanies.value = loadedCompanies
-  myApplications.value = loadedApplications
-
-  profileForm.value = {
-    fullName: loadedProfile.fullName,
-    address: loadedProfile.address,
-    email: loadedProfile.email,
-    description: loadedProfile.description ?? '',
-    phoneNumber: loadedProfile.phoneNumber,
-  }
-
-  if (loadedProfile.company) {
-    companyForm.value = {
-      companyName: loadedProfile.company.companyName,
-      address: loadedProfile.company.address,
-      email: loadedProfile.company.email,
-      description: loadedProfile.company.description,
-      phoneNumber: loadedProfile.company.phoneNumber,
-    }
-  }
-
+  await profileComposable.load()
   if (isEmployer.value) {
-    employerJobs.value = await getEmployerRecruitments()
-    employerApplicants.value = await getEmployerApplicants()
-  } else {
-    employerJobs.value = []
-    employerApplicants.value = []
+    await employerComposable.load()
   }
-}
-
-/** Refreshes only employer recruitment list — avoids full page reload */
-async function refreshEmployerJobs() {
-  employerJobs.value = await getEmployerRecruitments()
 }
 
 async function initializePage() {
   loading.value = true
   errorMessage.value = ''
   try {
-    // Always resolve session first — ProfilePage mounts before AppLayout's onMounted
     const user = await auth.refreshSession()
+    categories.value = await getCategories()
     if (user) {
       await loadAuthenticatedData()
-    } else {
-      categories.value = await getCategories()
     }
   } catch (error) {
     handleError(error, t('profile.loadProfileError'))
@@ -251,7 +113,7 @@ async function initializePage() {
   }
 }
 
-// ── Actions ────────────────────────────────────────────────────────────────
+// ── Auth actions ───────────────────────────────────────────────────────────
 async function submitAuth() {
   if (!validateAuthForm()) return
 
@@ -285,9 +147,10 @@ async function submitAuth() {
   }
 }
 
+// ── Profile actions ────────────────────────────────────────────────────────
 async function saveProfile() {
   try {
-    profile.value = await updateProfile(profileForm.value)
+    await profileComposable.saveProfile()
     noticeMessage.value = t('profile.profileUpdated')
   } catch (error) {
     handleError(error, t('profile.updateProfileError'))
@@ -296,78 +159,10 @@ async function saveProfile() {
 
 async function saveCompanyProfile() {
   try {
-    const company = await updateCompany(companyForm.value)
-    if (profile.value) profile.value = { ...profile.value, company }
+    await profileComposable.saveCompanyProfile()
     noticeMessage.value = t('profile.companyUpdated')
   } catch (error) {
     handleError(error, t('profile.updateCompanyError'))
-  }
-}
-
-async function createOrUpdateRecruitment() {
-  try {
-    if (editingRecruitmentId.value) {
-      await updateRecruitment(editingRecruitmentId.value, recruitmentForm.value)
-      noticeMessage.value = t('profile.recruitmentUpdated')
-    } else {
-      await createRecruitment(recruitmentForm.value)
-      noticeMessage.value = t('profile.recruitmentCreated')
-    }
-    await refreshEmployerJobs()
-    resetRecruitmentForm()
-  } catch (error) {
-    handleError(error, t('profile.saveRecruitmentError'))
-  }
-}
-
-function startEditRecruitment(job: RecruitmentSummary) {
-  editingRecruitmentId.value = job.id
-  recruitmentForm.value = {
-    title: job.title,
-    address: job.address,
-    description: job.description,
-    experience: job.experience,
-    quantity: job.quantity,
-    rank: job.rank,
-    salary: job.salary,
-    type: job.type,
-    deadline: job.deadline,
-    categoryId: job.categoryId,
-  }
-}
-
-async function removeRecruitment(recruitmentId: number) {
-  if (!window.confirm(t('profile.confirmDeleteRecruitment'))) return
-  try {
-    await deleteRecruitment(recruitmentId)
-    await refreshEmployerJobs()
-    noticeMessage.value = t('profile.recruitmentDeleted')
-    if (editingRecruitmentId.value === recruitmentId) {
-      resetRecruitmentForm()
-    }
-  } catch (error) {
-    handleError(error, t('profile.deleteRecruitmentError'))
-  }
-}
-
-async function approve(applyId: number) {
-  try {
-    await approveApplicant(applyId)
-    employerApplicants.value = await getEmployerApplicants()
-    noticeMessage.value = t('profile.applicationApproved')
-  } catch (error) {
-    handleError(error, t('profile.approveError'))
-  }
-}
-
-async function removeApplication(applyId: number) {
-  if (!window.confirm(t('profile.confirmDeleteApplication'))) return
-  try {
-    await deleteApplication(applyId)
-    myApplications.value = await getMyApplications()
-    noticeMessage.value = t('profile.applicationDeleted')
-  } catch (error) {
-    handleError(error, t('profile.deleteApplicationError'))
   }
 }
 
@@ -376,29 +171,71 @@ async function uploadFile(event: Event, type: 'avatar' | 'cv' | 'logo') {
   const file = input.files?.[0]
   if (!file) return
 
-  const validationError = validateUploadFile(file, type)
+  const validationError = profileComposable.validateFile(file, type)
   if (validationError) {
-    errorMessage.value = validationError
+    errorMessage.value = validationError.type === 'invalidType'
+      ? t('profile.validation.fileInvalidType')
+      : t('profile.validation.fileTooLarge')
     input.value = ''
     return
   }
 
   try {
     if (type === 'avatar') {
-      profile.value = await uploadAvatar(file)
+      await profileComposable.handleAvatarUpload(file)
       noticeMessage.value = t('profile.avatarUploaded')
     } else if (type === 'cv') {
-      profile.value = await uploadCv(file)
+      await profileComposable.handleCvUpload(file)
       noticeMessage.value = t('profile.cvUploaded')
     } else {
-      const company = await uploadLogo(file)
-      if (profile.value) profile.value = { ...profile.value, company }
+      await profileComposable.handleLogoUpload(file)
       noticeMessage.value = t('profile.logoUploaded')
     }
   } catch (error) {
     handleError(error, t('profile.uploadError'))
   } finally {
     input.value = ''
+  }
+}
+
+async function removeApplication(applyId: number) {
+  if (!window.confirm(t('profile.confirmDeleteApplication'))) return
+  try {
+    await profileComposable.removeApplication(applyId)
+    noticeMessage.value = t('profile.applicationDeleted')
+  } catch (error) {
+    handleError(error, t('profile.deleteApplicationError'))
+  }
+}
+
+// ── Employer actions ───────────────────────────────────────────────────────
+async function createOrUpdateRecruitment() {
+  try {
+    await employerComposable.saveRecruitment()
+    noticeMessage.value = editingRecruitmentId.value
+      ? t('profile.recruitmentUpdated')
+      : t('profile.recruitmentCreated')
+  } catch (error) {
+    handleError(error, t('profile.saveRecruitmentError'))
+  }
+}
+
+async function removeRecruitment(recruitmentId: number) {
+  if (!window.confirm(t('profile.confirmDeleteRecruitment'))) return
+  try {
+    await employerComposable.removeRecruitment(recruitmentId)
+    noticeMessage.value = t('profile.recruitmentDeleted')
+  } catch (error) {
+    handleError(error, t('profile.deleteRecruitmentError'))
+  }
+}
+
+async function approve(applyId: number) {
+  try {
+    await employerComposable.approve(applyId)
+    noticeMessage.value = t('profile.applicationApproved')
+  } catch (error) {
+    handleError(error, t('profile.approveError'))
   }
 }
 
@@ -450,8 +287,8 @@ onMounted(() => {
                 </div>
                 <div v-if="authMode === 'register'" class="col-md-6">
                   <select v-model="authForm.roleName" class="form-select">
-                    <option :value="'USER'">{{ t('profile.roleUser') }}</option>
-                    <option :value="'EMPLOYER'">{{ t('profile.roleEmployer') }}</option>
+                    <option value="USER">{{ t('profile.roleUser') }}</option>
+                    <option value="EMPLOYER">{{ t('profile.roleEmployer') }}</option>
                   </select>
                 </div>
               </div>
@@ -460,6 +297,7 @@ onMounted(() => {
                   {{ authMode === 'login' ? t('profile.signIn') : t('profile.createAccount') }}
                 </button>
                 <RouterLink class="btn btn-outline-secondary" to="/verify-email">{{ t('profile.verifyEmail') }}</RouterLink>
+                <RouterLink v-if="authMode === 'login'" class="btn btn-link px-0" to="/forgot-password">{{ t('profile.forgotPassword') }}</RouterLink>
               </div>
             </div>
           </div>
@@ -471,7 +309,6 @@ onMounted(() => {
           <div class="card mb-3">
             <div class="card-body">
               <h6 class="card-title fw-bold border-bottom pb-2 mb-3">{{ t('profile.profileInfo') }}</h6>
-              <!-- Avatar preview -->
               <div v-if="profile.image" class="mb-3">
                 <img :src="profile.image" alt="Avatar" class="rounded-circle border" style="width:72px;height:72px;object-fit:cover;" />
               </div>
@@ -526,8 +363,7 @@ onMounted(() => {
           <div class="card mb-3">
             <div class="card-body">
               <h6 class="card-title fw-bold border-bottom pb-2 mb-3">{{ t('profile.appliedJobs') }}</h6>
-              <div v-for="application in myApplications" :key="application.id"
-                class="border rounded p-3 mb-2">
+              <div v-for="application in myApplications" :key="application.id" class="border rounded p-3 mb-2">
                 <strong>{{ application.recruitmentTitle }}</strong>
                 <p class="text-muted small mb-2">{{ application.cvFileName }} · {{ application.createdAt }}</p>
                 <div class="d-flex gap-2">
@@ -548,8 +384,7 @@ onMounted(() => {
           <div class="card mb-3">
             <div class="card-body">
               <h6 class="card-title fw-bold border-bottom pb-2 mb-3">{{ t('profile.followedCompanies') }}</h6>
-              <div v-for="company in followedCompanies" :key="company.id"
-                class="border rounded p-3 mb-2">
+              <div v-for="company in followedCompanies" :key="company.id" class="border rounded p-3 mb-2">
                 <strong>{{ company.companyName }}</strong>
                 <p class="text-muted small mb-2">{{ company.address }}</p>
                 <button class="btn btn-outline-primary btn-sm" @click="router.push(`/companies/${company.id}`)">{{ t('common.details') }}</button>
@@ -639,7 +474,7 @@ onMounted(() => {
                 <button class="btn btn-primary btn-sm" @click="createOrUpdateRecruitment">
                   {{ editingRecruitmentId ? t('profile.updatePost') : t('profile.createPost') }}
                 </button>
-                <button v-if="editingRecruitmentId" class="btn btn-outline-secondary btn-sm" @click="resetRecruitmentForm">{{ t('common.cancelEdit') }}</button>
+                <button v-if="editingRecruitmentId" class="btn btn-outline-secondary btn-sm" @click="employerComposable.resetForm()">{{ t('common.cancelEdit') }}</button>
               </div>
             </div>
           </div>
@@ -652,7 +487,7 @@ onMounted(() => {
                 <strong>{{ job.title }}</strong>
                 <p class="text-muted small mb-2">{{ job.address }} · {{ job.salary }}</p>
                 <div class="d-flex gap-2">
-                  <button class="btn btn-outline-primary btn-sm" @click="startEditRecruitment(job)">{{ t('profile.edit') }}</button>
+                  <button class="btn btn-outline-primary btn-sm" @click="employerComposable.startEdit(job)">{{ t('profile.edit') }}</button>
                   <button class="btn btn-outline-danger btn-sm" @click="removeRecruitment(job.id)">{{ t('profile.delete') }}</button>
                 </div>
               </div>
@@ -664,8 +499,7 @@ onMounted(() => {
           <div v-if="isEmployer" class="card mb-3">
             <div class="card-body">
               <h6 class="card-title fw-bold border-bottom pb-2 mb-3">{{ t('profile.applicants') }}</h6>
-              <div v-for="application in employerApplicants" :key="application.id"
-                class="border rounded p-3 mb-2">
+              <div v-for="application in employerApplicants" :key="application.id" class="border rounded p-3 mb-2">
                 <strong>{{ application.candidateName }} · {{ application.recruitmentTitle }}</strong>
                 <p class="text-muted small mb-2">{{ application.cvFileName }}</p>
                 <button class="btn btn-outline-success btn-sm" @click="approve(application.id)">{{ t('profile.approve') }}</button>

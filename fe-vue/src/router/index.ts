@@ -1,5 +1,7 @@
 import type { RouteRecordRaw } from 'vue-router'
 
+import ForgotPasswordPage from '../modules/auth/pages/ForgotPasswordPage.vue'
+import ResetPasswordPage from '../modules/auth/pages/ResetPasswordPage.vue'
 import VerifyEmailPage from '../modules/auth/pages/VerifyEmailPage.vue'
 import CompaniesPage from '../modules/company/pages/CompaniesPage.vue'
 import CompanyPage from '../modules/company/pages/CompanyPage.vue'
@@ -16,4 +18,6 @@ export const appRoutes: RouteRecordRaw[] = [
   { path: '/companies/:id', component: CompanyPage },
   { path: '/profile', component: ProfilePage },
   { path: '/verify-email', component: VerifyEmailPage },
+  { path: '/forgot-password', component: ForgotPasswordPage },
+  { path: '/reset-password', component: ResetPasswordPage },
 ]

@@ -18,6 +18,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import huynv.jobservice.config.MailProperties;
 import huynv.jobservice.domain.Company;
@@ -32,8 +33,13 @@ import huynv.jobservice.repository.RoleRepository;
 import huynv.jobservice.repository.UserRepository;
 import huynv.jobservice.web.dto.AuthRequest;
 import huynv.jobservice.web.dto.EmailVerificationRequest;
+import huynv.jobservice.web.dto.ForgotPasswordRequest;
 import huynv.jobservice.web.dto.RegisterRequest;
 import huynv.jobservice.web.dto.ResendVerificationRequest;
+import huynv.jobservice.web.dto.ResetPasswordRequest;
+import huynv.jobservice.web.error.BadRequestException;
+import huynv.jobservice.web.error.NotFoundException;
+import huynv.jobservice.web.error.UnauthorizedException;
 import jakarta.servlet.http.HttpSession;
 
 @ExtendWith(MockitoExtension.class)
@@ -61,6 +67,8 @@ class AuthServiceImplTest {
         MailProperties mailProperties = new MailProperties();
         mailProperties.setFrontendBaseUrl("http://localhost:5173");
         mailProperties.setVerificationTtl(Duration.ofHours(24));
+        mailProperties.setPasswordResetTtl(Duration.ofHours(1));
+        PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
         authService = new AuthServiceImpl(
             userRepository,
             roleRepository,
@@ -68,7 +76,8 @@ class AuthServiceImplTest {
             companyRepository,
             resetTokenRepository,
             accountMailService,
-            mailProperties
+            mailProperties,
+            passwordEncoder
         );
     }
 
@@ -98,7 +107,7 @@ class AuthServiceImplTest {
             }
             return saved;
         });
-        when(resetTokenRepository.findByUserId(99L)).thenReturn(Optional.empty());
+        when(resetTokenRepository.findByUserIdAndType(99L, "VERIFICATION")).thenReturn(Optional.empty());
         when(resetTokenRepository.save(any(ResetToken.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         var response = authService.register(request);
@@ -126,7 +135,7 @@ class AuthServiceImplTest {
         when(userRepository.findByEmail("mary@example.com")).thenReturn(Optional.of(user));
 
         assertThatThrownBy(() -> authService.login(new AuthRequest("mary@example.com", "password"), session))
-            .isInstanceOf(IllegalArgumentException.class)
+            .isInstanceOf(UnauthorizedException.class)
             .hasMessage("Email verification required");
     }
 
@@ -141,11 +150,12 @@ class AuthServiceImplTest {
         ResetToken token = new ResetToken();
         token.setId(7L);
         token.setCode(authService.hashToken("plain-token"));
+        token.setType("VERIFICATION");
         token.setCreatedAt(Instant.now());
         token.setExpiredTime(Instant.now().plusSeconds(300));
         token.setUser(user);
 
-        when(resetTokenRepository.findByCode(authService.hashToken("plain-token"))).thenReturn(Optional.of(token));
+        when(resetTokenRepository.findByCodeAndType(authService.hashToken("plain-token"), "VERIFICATION")).thenReturn(Optional.of(token));
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
         var response = authService.verifyEmail(new EmailVerificationRequest("plain-token"));
@@ -161,7 +171,93 @@ class AuthServiceImplTest {
         when(userRepository.findByEmail("missing@example.com")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> authService.resendVerification(new ResendVerificationRequest("missing@example.com")))
-            .isInstanceOf(IllegalArgumentException.class)
+            .isInstanceOf(NotFoundException.class)
             .hasMessage("Account not found");
+    }
+
+    @Test
+    void forgotPasswordReturnsSameMessageForUnknownEmail() {
+        when(userRepository.findByEmail("ghost@example.com")).thenReturn(Optional.empty());
+
+        var response = authService.forgotPassword(new ForgotPasswordRequest("ghost@example.com"));
+
+        assertThat(response.message()).contains("If this email is registered");
+        verify(accountMailService, never()).sendPasswordResetEmail(any(), any());
+        verify(resetTokenRepository, never()).save(any());
+    }
+
+    @Test
+    void forgotPasswordIssuesTokenAndSendsEmailForKnownEmail() {
+        User user = new User();
+        user.setId(3L);
+        user.setEmail("alice@example.com");
+
+        when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(user));
+        when(resetTokenRepository.findByUserIdAndType(3L, "PASSWORD_RESET")).thenReturn(Optional.empty());
+        when(resetTokenRepository.save(any(ResetToken.class))).thenAnswer(i -> i.getArgument(0));
+
+        var response = authService.forgotPassword(new ForgotPasswordRequest("alice@example.com"));
+
+        assertThat(response.message()).contains("If this email is registered");
+        verify(resetTokenRepository).save(any(ResetToken.class));
+        verify(accountMailService).sendPasswordResetEmail(any(User.class), any(String.class));
+    }
+
+    @Test
+    void resetPasswordUpdatesPasswordAndDeletesToken() {
+        User user = new User();
+        user.setId(4L);
+        user.setEmail("bob@example.com");
+
+        String plainToken = "my-plain-token";
+        ResetToken token = new ResetToken();
+        token.setId(9L);
+        token.setCode(authService.hashToken(plainToken));
+        token.setType("PASSWORD_RESET");
+        token.setCreatedAt(Instant.now());
+        token.setExpiredTime(Instant.now().plusSeconds(3600));
+        token.setUser(user);
+
+        when(resetTokenRepository.findByCodeAndType(authService.hashToken(plainToken), "PASSWORD_RESET"))
+            .thenReturn(Optional.of(token));
+        when(userRepository.save(any(User.class))).thenAnswer(i -> i.getArgument(0));
+
+        var response = authService.resetPassword(new ResetPasswordRequest(plainToken, "newpassword123"));
+
+        assertThat(response.message()).contains("Password reset successfully");
+        assertThat(user.getPassword()).isNotNull();
+        verify(resetTokenRepository).delete(token);
+    }
+
+    @Test
+    void resetPasswordRejectsInvalidToken() {
+        when(resetTokenRepository.findByCodeAndType(any(), any())).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> authService.resetPassword(new ResetPasswordRequest("invalid-token", "newpassword123")))
+            .isInstanceOf(BadRequestException.class);
+    }
+
+    @Test
+    void resetPasswordRejectsAndDeletesExpiredToken() {
+        User user = new User();
+        user.setId(6L);
+
+        String plainToken = "expired-token";
+        ResetToken token = new ResetToken();
+        token.setId(11L);
+        token.setCode(authService.hashToken(plainToken));
+        token.setType("PASSWORD_RESET");
+        token.setCreatedAt(Instant.now().minusSeconds(7200));
+        token.setExpiredTime(Instant.now().minusSeconds(3600));
+        token.setUser(user);
+
+        when(resetTokenRepository.findByCodeAndType(authService.hashToken(plainToken), "PASSWORD_RESET"))
+            .thenReturn(Optional.of(token));
+
+        assertThatThrownBy(() -> authService.resetPassword(new ResetPasswordRequest(plainToken, "newpassword123")))
+            .isInstanceOf(BadRequestException.class)
+            .hasMessageContaining("expired");
+
+        verify(resetTokenRepository).delete(token);
     }
 }

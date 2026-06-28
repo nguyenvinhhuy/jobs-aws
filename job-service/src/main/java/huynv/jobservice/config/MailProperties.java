@@ -3,7 +3,11 @@ package huynv.jobservice.config;
 import java.time.Duration;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import lombok.Getter;
+import lombok.Setter;
 
+@Getter
+@Setter
 @ConfigurationProperties(prefix = "app.mail")
 public class MailProperties {
 
@@ -12,44 +16,5 @@ public class MailProperties {
     private String fromName;
     private String frontendBaseUrl;
     private Duration verificationTtl = Duration.ofHours(24);
-
-    public boolean isEnabled() {
-        return enabled;
-    }
-
-    public void setEnabled(boolean enabled) {
-        this.enabled = enabled;
-    }
-
-    public String getFromAddress() {
-        return fromAddress;
-    }
-
-    public void setFromAddress(String fromAddress) {
-        this.fromAddress = fromAddress;
-    }
-
-    public String getFromName() {
-        return fromName;
-    }
-
-    public void setFromName(String fromName) {
-        this.fromName = fromName;
-    }
-
-    public String getFrontendBaseUrl() {
-        return frontendBaseUrl;
-    }
-
-    public void setFrontendBaseUrl(String frontendBaseUrl) {
-        this.frontendBaseUrl = frontendBaseUrl;
-    }
-
-    public Duration getVerificationTtl() {
-        return verificationTtl;
-    }
-
-    public void setVerificationTtl(Duration verificationTtl) {
-        this.verificationTtl = verificationTtl;
-    }
+    private Duration passwordResetTtl = Duration.ofHours(1);
 }

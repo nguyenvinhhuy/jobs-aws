@@ -98,6 +98,38 @@ create table if not exists reset_token (
     code varchar(255) not null,
     expired_time timestamp not null,
     created_at timestamp not null,
-    user_id bigint not null unique,
+    type varchar(20) not null default 'VERIFICATION',
+    user_id bigint not null,
     constraint fk_reset_token_user foreign key (user_id) references users (id)
 );
+
+-- Indexes on FK columns for query performance
+create index if not exists idx_users_role_id on users (role_id);
+create index if not exists idx_recruitment_company_id on recruitment (company_id);
+create index if not exists idx_recruitment_category_id on recruitment (category_id);
+create index if not exists idx_follow_company_user_id on follow_company (user_id);
+create index if not exists idx_follow_company_company_id on follow_company (company_id);
+create index if not exists idx_save_job_user_id on save_job (user_id);
+create index if not exists idx_save_job_recruitment_id on save_job (recruitment_id);
+create index if not exists idx_applypost_user_id on applypost (user_id);
+create index if not exists idx_applypost_recruitment_id on applypost (recruitment_id);
+create index if not exists idx_reset_token_user_id on reset_token (user_id);
+
+-- Unique constraints to prevent duplicate follows/saves
+alter table follow_company drop constraint if exists uq_follow_company_user_company;
+alter table follow_company add constraint uq_follow_company_user_company unique (user_id, company_id);
+alter table save_job drop constraint if exists uq_save_job_user_recruitment;
+alter table save_job add constraint uq_save_job_user_recruitment unique (user_id, recruitment_id);
+
+-- Migrate: add type column and composite unique if upgrading from earlier schema
+alter table reset_token add column if not exists type varchar(20) not null default 'VERIFICATION';
+alter table reset_token drop constraint if exists reset_token_user_id_key;
+do $$
+begin
+    if not exists (
+        select 1 from pg_constraint
+        where conname = 'uq_reset_token_user_type' and conrelid = 'reset_token'::regclass
+    ) then
+        alter table reset_token add constraint uq_reset_token_user_type unique (user_id, type);
+    end if;
+end $$;

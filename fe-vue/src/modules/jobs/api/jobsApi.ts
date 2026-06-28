@@ -9,15 +9,17 @@ import type {
   RecruitmentSummary,
 } from '../../../shared/types/api'
 
-export function getHomeOverview() {
-  return apiClient.get<HomeOverview>('/api/public/home').then((response) => response.data)
+export async function getHomeOverview() {
+  const response = await apiClient.get<HomeOverview>('/api/public/home')
+  return response.data
 }
 
-export function getCategories() {
-  return apiClient.get<CategorySummary[]>('/api/public/categories').then((response) => response.data)
+export async function getCategories() {
+  const response = await apiClient.get<CategorySummary[]>('/api/public/categories')
+  return response.data
 }
 
-export function getRecruitments(params: {
+export async function getRecruitments(params: {
   page?: number
   size?: number
   keyword?: string
@@ -26,28 +28,21 @@ export function getRecruitments(params: {
   address?: string | null
   jobType?: string | null
 }) {
-  return apiClient
-    .get<PageResponse<RecruitmentSummary>>('/api/public/recruitments', { params })
-    .then((response) => response.data)
+  const response = await apiClient.get<PageResponse<RecruitmentSummary>>('/api/public/recruitments', { params })
+  return response.data
 }
 
-export function getRecruitmentDetail(id: number) {
-  return apiClient.get<RecruitmentDetail>(`/api/public/recruitments/${id}`).then((response) => response.data)
+export async function getRecruitmentDetail(id: number) {
+  const response = await apiClient.get<RecruitmentDetail>(`/api/public/recruitments/${id}`)
+  return response.data
 }
 
-export function getCompanyDetail(id: number) {
-  return apiClient.get<CompanyDetail>(`/api/public/companies/${id}`).then((response) => response.data)
+export async function getCompanyDetail(id: number) {
+  const response = await apiClient.get<CompanyDetail>(`/api/public/companies/${id}`)
+  return response.data
 }
 
-export function getTopCompanies(limit = 4) {
-  return apiClient
-    .get<CompanySummary[]>('/api/public/companies/top', { params: { limit } })
-    .then((response) => response.data)
+export async function getCompanies(params?: { keyword?: string; limit?: number }) {
+  const response = await apiClient.get<CompanySummary[]>('/api/public/companies', { params })
+  return response.data
 }
-
-export function getCompanies(params?: { keyword?: string; limit?: number }) {
-  return apiClient
-    .get<CompanySummary[]>('/api/public/companies', { params })
-    .then((response) => response.data)
-}
-
